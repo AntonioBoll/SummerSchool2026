@@ -69,9 +69,14 @@ subj_all <- d %>%
 
 pretty_var <- function(s) trimws(gsub("_", " ", sub("_trait$", "", s)))
 var_choices <- c("Age" = "age",
+                 "Sex" = "sex",
                  "Circadian acrophase (mean)" = "acro_mean",
                  "Circadian acrophase (SD / variability)" = "acro_sd",
                  setNames(trait_cols_all, vapply(trait_cols_all, pretty_var, character(1))))
+
+# sleep-quality metrics for the research-question tab (per person)
+sq_metrics <- c("Sleep efficiency"           = "sleep_efficiency_trait",
+                "Acrophase variability / SD" = "acro_sd")
 
 # age x weekend interaction model (continuous age; fit once)
 d$sid <- factor(d$subject_id)
@@ -98,14 +103,17 @@ ui <- dashboardPage(
 
   dashboardSidebar(
     sidebarMenu(
-      menuItem("Histogram", tabName = "hist_tab",   icon = icon("chart-column")),
+      menuItem("Exploratory graphs", tabName = "hist_tab", icon = icon("chart-column")),
       menuItem("Variable explorer", tabName = "vars_tab", icon = icon("magnifying-glass-chart")),
-      menuItem("Thought 1: Age & rest", tabName = "thought1", icon = icon("bed")),
-      menuItem("Circadian SD (age & sex)", tabName = "sd_tab", icon = icon("wave-square")),
-      menuItem("Sleep efficiency (age & sex)", tabName = "se_tab", icon = icon("bed-pulse")),
-      menuItem("Thought 2: Sleep & variability", tabName = "thought2", icon = icon("moon")),
-      menuItem("Thought 3: Sex & variability", tabName = "thought3", icon = icon("venus-mars")),
-      menuItem("Thought 4: Age, sleep & variability", tabName = "thought4", icon = icon("children"))
+      menuItem("Research Q", tabName = "sq_tab", icon = icon("bed-pulse")),
+      menuItem("Tested ideas", icon = icon("flask"), startExpanded = TRUE,
+        menuSubItem("Thought 1: Age & rest", tabName = "thought1", icon = icon("bed")),
+        menuSubItem("Circadian SD (age & sex)", tabName = "sd_tab", icon = icon("wave-square")),
+        menuSubItem("Sleep efficiency (age & sex)", tabName = "se_tab", icon = icon("bed-pulse")),
+        menuSubItem("Thought 2: Sleep & variability", tabName = "thought2", icon = icon("moon")),
+        menuSubItem("Thought 3: Sex & variability", tabName = "thought3", icon = icon("venus-mars")),
+        menuSubItem("Thought 4: Age, sleep & variability", tabName = "thought4", icon = icon("children"))
+      )
     )
   ),
 
@@ -125,7 +133,9 @@ ui <- dashboardPage(
           box(width = 4, status = "primary", solidHeader = TRUE, title = "Filters",
             selectInput("var", "Variable:", choices = num_vars,
                         selected = "circadian_acrophase"),
-            sliderInput("bins", "Number of bins:", min = 5, max = 80, value = 30),
+            conditionalPanel(
+              condition = "output.var_continuous == true",
+              sliderInput("bins", "Number of bins:", min = 5, max = 80, value = 30)),
             selectInput("group", "Colour by:", choices = group_vars)
           ),
           box(width = 8, status = "primary", solidHeader = TRUE, title = "Histogram",
@@ -154,10 +164,23 @@ ui <- dashboardPage(
           box(width = 4, status = "primary", solidHeader = TRUE, title = "Controls",
             selectInput("vx", "Variable 1 (X):", choices = var_choices, selected = "age"),
             selectInput("vy", "Variable 2 (Y):", choices = var_choices, selected = "acro_sd"),
-            selectInput("vcol", "Colour by:", choices = c("None" = "none", "Sex" = "sex"))
+            selectInput("vcol", "Colour by:", choices = c("None" = "none", "Sex" = "sex")),
+            checkboxInput("v_outlier", "Remove outliers (1.5 x IQR on X or Y)", FALSE),
+            helpText("One value per person (per-person, not per-day).")
           ),
-          valueBoxOutput("v_vb_r", width = 4),
-          valueBoxOutput("v_vb_p", width = 4)
+          column(width = 4,
+            valueBoxOutput("v_vb_r",   width = 12),
+            valueBoxOutput("v_vb_rho", width = 12)),
+          column(width = 4,
+            valueBoxOutput("v_vb_p",  width = 12),
+            valueBoxOutput("v_vb_sp", width = 12))
+        ),
+        conditionalPanel(
+          condition = "input.vcol == 'sex' && input.vx != 'sex' && input.vy != 'sex'",
+          fluidRow(
+            valueBoxOutput("v_vb_fem",  width = 6),
+            valueBoxOutput("v_vb_male", width = 6)
+          )
         ),
         fluidRow(
           box(width = 12, status = "primary", solidHeader = TRUE,
@@ -174,6 +197,49 @@ ui <- dashboardPage(
           box(width = 12, status = "primary", solidHeader = TRUE,
               title = "Test results", verbatimTextOutput("v_stats"))
         )
+      ),
+
+      # ---- Tab: Sleep quality (research question) ---------------------
+      tabItem("sq_tab",
+        fluidRow(
+          box(width = 12, background = "olive",
+            h4(tags$b("Sleep quality across people (research question)")),
+            p(style = "font-size:15px;text-align:justify",
+              "RQ: how does sleep quality differ from person to person (age, sex)? ",
+              "Hypotheses: sleep quality differs across age groups, and between women ",
+              "and men. Metrics: sleep efficiency and sleep duration (higher = better), ",
+              "and acrophase variability (lower = better). Pick a metric to see it ",
+              "against age, sex, and age+sex, each with a test.")
+          )
+        ),
+        fluidRow(
+          box(width = 12, status = "primary", solidHeader = TRUE, title = "Controls",
+            fluidRow(
+              column(6, selectInput("sq_metric", "Sleep-quality metric:",
+                                    choices = sq_metrics, selected = "sleep_efficiency_trait")),
+              column(6, sliderInput("sq_split", "Age split (younger / older):",
+                                    min = 30, max = 70, value = 40, step = 5))
+            )
+          )
+        ),
+        fluidRow(
+          box(width = 12, status = "primary", solidHeader = TRUE,
+              title = "1. Age vs sleep quality",
+              plotlyOutput("sq_g1", height = 460))
+        ),
+        fluidRow(column(12, verbatimTextOutput("sq_s1"))),
+        fluidRow(
+          box(width = 12, status = "primary", solidHeader = TRUE,
+              title = "2. Sex vs sleep quality",
+              plotlyOutput("sq_g2", height = 460))
+        ),
+        fluidRow(column(12, verbatimTextOutput("sq_s2"))),
+        fluidRow(
+          box(width = 12, status = "primary", solidHeader = TRUE,
+              title = "3. Age group + Sex vs sleep quality",
+              plotlyOutput("sq_g3", height = 460))
+        ),
+        fluidRow(column(12, verbatimTextOutput("sq_s3")))
       ),
 
       # ---- Tab 2: Thought 1 — Age & days off --------------------------
@@ -432,93 +498,322 @@ ui <- dashboardPage(
 server <- function(input, output) {
 
   # ----- Tab 1: histogram -----
-  output$hist <- renderPlotly({
-    g <- if (input$group == "none") NULL else input$group
-    p <- ggplot(d, aes(x = .data[[input$var]]))
-    p <- if (is.null(g)) p + geom_histogram(bins = input$bins, fill = "#3182bd", colour = "white")
-         else p + geom_histogram(aes(fill = .data[[g]]), bins = input$bins,
-                                  colour = "white", position = "identity", alpha = 0.6)
-    bg(ggplotly(p + labs(x = input$var, y = "Count", fill = NULL) +
-                theme_minimal(base_size = 13)))
-  })
-  output$summary1 <- renderPrint(summary(d[[input$var]]))
+  # discrete = 15 or fewer distinct values (0/1 flags, age, etc.) -> bar chart
+  var_is_discrete <- reactive(length(unique(na.omit(d[[input$var]]))) <= 15)
+  # flag for the UI: show the bin slider only for continuous variables
+  output$var_continuous <- reactive(!var_is_discrete())
+  outputOptions(output, "var_continuous", suspendWhenHidden = FALSE)
 
-  # ----- Tab: Variable explorer -----
-  v_lab <- function(v) names(var_choices)[match(v, var_choices)]
-  v_data <- reactive({
-    data.frame(x = subj_all[[input$vx]], y = subj_all[[input$vy]],
-               sex = subj_all$sex) %>% filter(is.finite(x), is.finite(y))
+  output$hist <- renderPlotly({
+    v <- input$var
+    g <- if (input$group == "none") NULL else input$group
+    if (var_is_discrete()) {                     # bar chart of counts (few distinct values)
+      dd <- d; dd[[v]] <- factor(dd[[v]])
+      p <- ggplot(dd, aes(x = .data[[v]]))
+      p <- if (is.null(g)) p + geom_bar(fill = "#3182bd")
+           else p + geom_bar(aes(fill = .data[[g]]), position = "dodge")
+      p <- p + labs(x = v, y = "Count (participant-days)", fill = NULL,
+                    subtitle = "discrete variable (few distinct values) - shown as a bar chart")
+    } else {                                     # histogram for continuous variables
+      p <- ggplot(d, aes(x = .data[[v]]))
+      p <- if (is.null(g)) p + geom_histogram(bins = input$bins, fill = "#3182bd", colour = "white")
+           else p + geom_histogram(aes(fill = .data[[g]]), bins = input$bins,
+                                    colour = "white", position = "identity", alpha = 0.6)
+      p <- p + labs(x = v, y = "Count", fill = NULL)
+    }
+    bg(ggplotly(p + theme_minimal(base_size = 13)))
   })
-  v_ct <- reactive({ df <- v_data(); cor.test(df$x, df$y) })
+
+  output$summary1 <- renderPrint({
+    x <- d[[input$var]]
+    if (var_is_discrete()) {
+      cat("Discrete variable - counts:\n"); print(table(x, useNA = "ifany"))
+    } else summary(x)
+  })
+
+  # ----- Tab: Variable explorer (type-aware: numeric vs numeric = correlation;
+  #        numeric vs Sex = group comparison) -----
+  v_lab   <- function(v) names(var_choices)[match(v, var_choices)]
+  is_cat  <- function(v) v == "sex"
+  in_fence <- function(z) { q <- quantile(z, c(.25, .75)); i <- 1.5 * (q[2] - q[1])
+                            z >= q[1] - i & z <= q[2] + i }
+  v_mode <- reactive({
+    cx <- is_cat(input$vx); cy <- is_cat(input$vy)
+    if (cx && cy) "cat" else if (cx || cy) "group" else "corr"
+  })
+  v_raw <- reactive({
+    df <- data.frame(x = subj_all[[input$vx]], y = subj_all[[input$vy]],
+                     sex = subj_all$sex, stringsAsFactors = FALSE)
+    if (!is_cat(input$vx)) df <- df[is.finite(df$x), ]
+    if (!is_cat(input$vy)) df <- df[is.finite(df$y), ]
+    df
+  })
+  v_data <- reactive({
+    df <- v_raw()
+    if (isTRUE(input$v_outlier)) {
+      if (!is_cat(input$vx)) df <- df[in_fence(as.numeric(df$x)), ]
+      if (!is_cat(input$vy)) df <- df[in_fence(as.numeric(df$y)), ]
+    }
+    df
+  })
+  v_ct <- reactive({ if (v_mode() != "corr") return(NULL); df <- v_data(); cor.test(df$x, df$y) })
+  v_cs <- reactive({ if (v_mode() != "corr") return(NULL); df <- v_data()
+                     suppressWarnings(cor.test(df$x, df$y, method = "spearman")) })
+  # numeric values split by sex, for the group-comparison mode
+  v_group <- reactive({
+    numcol <- if (is_cat(input$vx)) "y" else "x"
+    df <- v_data(); vals <- as.numeric(df[[numcol]])
+    list(f = vals[df$sex == "Female"], m = vals[df$sex == "Male"],
+         numlab = v_lab(if (numcol == "y") input$vy else input$vx))
+  })
 
   output$v_vb_r <- renderValueBox({
-    r <- v_ct()$estimate
-    valueBox(sprintf("%+.2f", r), "Pearson correlation r",
-             icon = icon("link"), color = if (abs(r) >= 0.3) "blue" else "aqua")
+    if (v_mode() == "corr") {
+      r <- v_ct()$estimate
+      valueBox(sprintf("%+.2f", r), "Pearson r", icon = icon("link"),
+               color = if (abs(r) >= 0.3) "blue" else "aqua")
+    } else if (v_mode() == "group") {
+      g <- v_group(); valueBox(sprintf("%.2f", mean(g$f)),
+               sprintf("Female: mean (n=%d)", length(g$f)), icon = icon("venus"), color = "purple")
+    } else valueBox("-", "pick a numeric variable", icon = icon("ban"), color = "black")
+  })
+  output$v_vb_rho <- renderValueBox({
+    if (v_mode() == "corr") {
+      r <- v_cs()$estimate
+      valueBox(sprintf("%+.2f", r), "Spearman rho", icon = icon("ranking-star"),
+               color = if (abs(r) >= 0.3) "purple" else "light-blue")
+    } else if (v_mode() == "group") {
+      g <- v_group(); valueBox(sprintf("%.2f", mean(g$m)),
+               sprintf("Male: mean (n=%d)", length(g$m)), icon = icon("mars"), color = "blue")
+    } else valueBox("-", "", icon = icon("ban"), color = "black")
   })
   output$v_vb_p <- renderValueBox({
-    p <- v_ct()$p.value
-    valueBox(sprintf("%.3f", p), "p-value",
-             icon = icon("flask"), color = if (p < 0.05) "green" else "red")
+    if (v_mode() == "corr") {
+      p <- v_ct()$p.value
+      valueBox(sprintf("%.3f", p), "Pearson p-value", icon = icon("flask"),
+               color = if (p < 0.05) "green" else "red")
+    } else if (v_mode() == "group") {
+      g <- v_group(); valueBox(sprintf("%+.2f", mean(g$f) - mean(g$m)),
+               "Difference (F - M)", icon = icon("arrows-left-right"), color = "navy")
+    } else valueBox("-", "", icon = icon("ban"), color = "black")
+  })
+  output$v_vb_sp <- renderValueBox({
+    if (v_mode() == "corr") {
+      p <- v_cs()$p.value
+      valueBox(sprintf("%.3f", p), "Spearman p-value", icon = icon("flask"),
+               color = if (p < 0.05) "green" else "red")
+    } else if (v_mode() == "group") {
+      g <- v_group(); p <- t.test(g$f, g$m)$p.value
+      valueBox(sprintf("%.3f", p), "t-test p-value", icon = icon("flask"),
+               color = if (p < 0.05) "green" else "red")
+    } else valueBox("-", "", icon = icon("ban"), color = "black")
+  })
+
+  # per-sex correlation (numeric vs numeric only) — shown as two boxes
+  v_sex_cor <- function(s) {
+    if (v_mode() != "corr") return(NULL)
+    ss <- v_data(); ss <- ss[ss$sex == s, ]
+    if (nrow(ss) < 4) return(NULL)
+    ct <- suppressWarnings(cor.test(ss$x, ss$y)); ct$n <- nrow(ss); ct
+  }
+  output$v_vb_fem <- renderValueBox({
+    ct <- v_sex_cor("Female")
+    if (is.null(ct)) return(valueBox("-", "Female r (numeric x numeric only)",
+                                     icon = icon("venus"), color = "black"))
+    valueBox(sprintf("%+.2f", ct$estimate),
+             sprintf("Female: r  (p=%.3f, n=%d)", ct$p.value, ct$n),
+             icon = icon("venus"), color = if (ct$p.value < 0.05) "green" else "purple")
+  })
+  output$v_vb_male <- renderValueBox({
+    ct <- v_sex_cor("Male")
+    if (is.null(ct)) return(valueBox("-", "Male r (numeric x numeric only)",
+                                     icon = icon("mars"), color = "black"))
+    valueBox(sprintf("%+.2f", ct$estimate),
+             sprintf("Male: r  (p=%.3f, n=%d)", ct$p.value, ct$n),
+             icon = icon("mars"), color = if (ct$p.value < 0.05) "green" else "blue")
   })
 
   output$v_scatter <- renderPlotly({
-    df <- v_data()
+    if (v_mode() == "cat") {
+      return(bg(ggplotly(ggplot() +
+        annotate("text", 1, 1, label = "Pick at least one numeric variable") +
+        theme_void())))
+    }
+    if (v_mode() == "group") {                       # numeric by sex -> boxplot
+      numcol <- if (is_cat(input$vx)) "y" else "x"
+      df <- v_data(); df$val <- as.numeric(df[[numcol]])
+      p <- ggplot(df, aes(x = sex, y = val, fill = sex)) +
+        geom_boxplot(alpha = 0.6, width = 0.5, outlier.shape = NA) +
+        geom_jitter(width = 0.12, alpha = 0.5, size = 1.5) +
+        labs(x = NULL, y = v_group()$numlab, fill = NULL,
+             title = paste(v_group()$numlab, "by sex")) +
+        theme_minimal(base_size = 13) +
+        theme(legend.position = "none", plot.title = element_text(hjust = 0.5))
+      return(ggplotly(p) %>% layout(plot_bgcolor = "white", paper_bgcolor = "white"))
+    }
+    df <- v_data()                                   # numeric vs numeric -> scatter
     if (input$vcol == "sex") {
       p <- ggplot(df, aes(x = x, y = y, colour = sex)) +
-        geom_point(alpha = 0.7, size = 2) +
-        geom_smooth(method = "lm", se = TRUE, linewidth = 0.9)
+        geom_point(alpha = 0.7, size = 2) + geom_smooth(method = "lm", se = TRUE, linewidth = 0.9)
     } else {
       p <- ggplot(df, aes(x = x, y = y)) +
         geom_point(alpha = 0.7, size = 2, colour = "#3182bd") +
         geom_smooth(method = "lm", se = TRUE, linewidth = 0.9, colour = "black", fill = "grey80")
     }
-    p <- p + labs(x = v_lab(input$vx), y = v_lab(input$vy), colour = NULL) +
-      theme_minimal(base_size = 13)
-    bg(ggplotly(p))
+    p <- p + labs(x = v_lab(input$vx), y = v_lab(input$vy), colour = NULL,
+                  title = paste(v_lab(input$vx), "vs", v_lab(input$vy))) +
+      theme_minimal(base_size = 13) + theme(plot.title = element_text(hjust = 0.5))
+    ggplotly(p) %>% layout(plot_bgcolor = "white", paper_bgcolor = "white")
   })
 
-  v_hist <- function(col, lab) {
-    df <- data.frame(v = subj_all[[col]], sex = subj_all$sex)
-    df <- df[is.finite(df$v), ]
-    if (input$vcol == "sex") {
-      p <- ggplot(df, aes(v, fill = sex)) +
-        geom_histogram(bins = 25, colour = "white", position = "identity", alpha = 0.6)
+  v_hist <- function(which, varname) {
+    df <- v_data(); df$v <- df[[which]]; lab <- v_lab(varname)
+    if (is_cat(varname)) {
+      p <- ggplot(df, aes(factor(v))) + geom_bar(fill = "#3182bd") + labs(x = lab, y = "Count")
     } else {
-      p <- ggplot(df, aes(v)) + geom_histogram(bins = 25, fill = "#3182bd", colour = "white")
+      df$v <- as.numeric(df$v)
+      if (input$vcol == "sex")
+        p <- ggplot(df, aes(v, fill = sex)) +
+          geom_histogram(bins = 25, colour = "white", position = "identity", alpha = 0.6)
+      else p <- ggplot(df, aes(v)) + geom_histogram(bins = 25, fill = "#3182bd", colour = "white")
+      p <- p + labs(x = lab, y = "Count", fill = NULL)
     }
-    bg(ggplotly(p + labs(x = lab, y = "Count", fill = NULL) + theme_minimal(base_size = 12)))
+    p <- p + labs(title = paste("Distribution of", lab)) +
+      theme_minimal(base_size = 12) + theme(plot.title = element_text(hjust = 0.5))
+    ggplotly(p) %>% layout(plot_bgcolor = "white", paper_bgcolor = "white")
   }
-  output$v_histx <- renderPlotly(v_hist(input$vx, v_lab(input$vx)))
-  output$v_histy <- renderPlotly(v_hist(input$vy, v_lab(input$vy)))
+  output$v_histx <- renderPlotly(v_hist("x", input$vx))
+  output$v_histy <- renderPlotly(v_hist("y", input$vy))
 
   output$v_stats <- renderPrint({
     df <- v_data()
     cat("Variable 1 (X):", v_lab(input$vx), "\n")
     cat("Variable 2 (Y):", v_lab(input$vy), "\n")
-    cat("n =", nrow(df), "people\n")
+    if (isTRUE(input$v_outlier))
+      cat("n =", nrow(df), "people  (", nrow(v_raw()) - nrow(df), "outliers removed, 1.5 x IQR)\n")
+    else cat("n =", nrow(df), "people\n")
     cat("--------------------------------------------------------------------\n")
+
+    if (v_mode() == "cat") { cat("Both variables are Sex - pick at least one numeric variable.\n"); return(invisible()) }
+
+    if (v_mode() == "group") {                       # t-test of numeric by sex
+      g <- v_group(); tt <- t.test(g$f, g$m)
+      d <- (mean(g$f) - mean(g$m)) / sqrt(((length(g$f)-1)*var(g$f) + (length(g$m)-1)*var(g$m)) /
+                                          (length(g$f)+length(g$m)-2))
+      cat("Comparing", g$numlab, "between Female and Male:\n")
+      cat(sprintf("   Female: mean %.3f (n=%d)\n   Male  : mean %.3f (n=%d)\n",
+                  mean(g$f), length(g$f), mean(g$m), length(g$m)))
+      cat(sprintf("   difference (F - M) = %+.3f\n", mean(g$f) - mean(g$m)))
+      cat(sprintf("   Welch t-test : t = %.2f, p = %.4f, 95%% CI [%.3f, %.3f]\n",
+                  tt$statistic, tt$p.value, tt$conf.int[1], tt$conf.int[2]))
+      cat(sprintf("   Wilcoxon     : p = %.4f\n", suppressWarnings(wilcox.test(g$f, g$m)$p.value)))
+      cat(sprintf("   Cohen's d    : %.2f\n", d))
+      cat(sprintf("\n%s\n", if (tt$p.value < 0.05) "Significant difference (p < 0.05)."
+                            else "No significant difference (p > 0.05)."))
+      return(invisible())
+    }
+
     if (input$vx == input$vy) { cat("Pick two different variables.\n"); return(invisible()) }
-    ct <- cor.test(df$x, df$y)
-    cs <- suppressWarnings(cor.test(df$x, df$y, method = "spearman"))
+    ct <- cor.test(df$x, df$y); cs <- suppressWarnings(cor.test(df$x, df$y, method = "spearman"))
     cat(sprintf("Pearson  r   = %+.3f   95%% CI [%.2f, %.2f]   p = %.4f\n",
                 ct$estimate, ct$conf.int[1], ct$conf.int[2], ct$p.value))
     cat(sprintf("Spearman rho = %+.3f                       p = %.4f\n", cs$estimate, cs$p.value))
-    m <- lm(y ~ x, df); cf <- summary(m)$coefficients["x", ]
-    cat(sprintf("Linear fit   : slope = %+.4f per unit X, p = %.4f, R^2 = %.3f\n",
-                cf[1], cf[4], summary(m)$r.squared))
     if (input$vcol == "sex") {
       cat("\nWithin each sex:\n")
       for (s in c("Female", "Male")) {
         ss <- df[df$sex == s, ]
         if (nrow(ss) > 3) cat(sprintf("   %-7s (n=%2d): r = %+.3f, p = %.3f\n",
-                                      s, nrow(ss), cor(ss$x, ss$y),
-                                      cor.test(ss$x, ss$y)$p.value))
+                                      s, nrow(ss), cor(ss$x, ss$y), cor.test(ss$x, ss$y)$p.value))
       }
     }
-    cat(sprintf("\n%s\n", if (ct$p.value < 0.05)
-      "Significant association (p < 0.05)." else
-      "No significant association (p > 0.05)."))
+    cat(sprintf("\n%s\n", if (ct$p.value < 0.05) "Significant association (p < 0.05)."
+                          else "No significant association (p > 0.05)."))
+  })
+
+  # ----- Tab: Sleep quality (research question) -----
+  sq_lab <- reactive(names(sq_metrics)[match(input$sq_metric, sq_metrics)])
+  sq_df <- reactive({
+    d0 <- subj_all %>% mutate(duration = sleep_tib_trait * sleep_efficiency_trait)
+    d0$m <- d0[[input$sq_metric]]
+    d0 <- d0[is.finite(d0$m), ]
+    d0$agegrp <- factor(ifelse(d0$age >= input$sq_split,
+                               paste0("Older (", input$sq_split, "+)"),
+                               paste0("Younger (<", input$sq_split, ")")),
+                        levels = c(paste0("Younger (<", input$sq_split, ")"),
+                                   paste0("Older (", input$sq_split, "+)")))
+    d0
+  })
+
+  # 1. Age group vs metric (boxplot)
+  output$sq_g1 <- renderPlotly({
+    df <- sq_df()
+    p <- ggplot(df, aes(x = agegrp, y = m, fill = agegrp)) +
+      geom_boxplot(alpha = 0.6, width = 0.5, outlier.shape = NA) +
+      geom_jitter(width = 0.12, alpha = 0.5, size = 1.4) +
+      labs(x = NULL, y = sq_lab(), fill = "Age group",
+           title = paste(sq_lab(), "by age group")) +
+      theme_minimal(base_size = 13) + theme(plot.title = element_text(hjust = 0.5))
+    ggplotly(p) %>% layout(plot_bgcolor = "white", paper_bgcolor = "white",
+                           legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.15))
+  })
+  # 2. Sex vs metric (boxplot)
+  output$sq_g2 <- renderPlotly({
+    df <- sq_df()
+    p <- ggplot(df, aes(x = sex, y = m, fill = sex)) +
+      geom_boxplot(alpha = 0.6, width = 0.5, outlier.shape = NA) +
+      geom_jitter(width = 0.12, alpha = 0.5, size = 1.4) +
+      labs(x = NULL, y = sq_lab(), fill = "Sex",
+           title = paste(sq_lab(), "by sex")) +
+      theme_minimal(base_size = 13) + theme(plot.title = element_text(hjust = 0.5))
+    ggplotly(p) %>% layout(plot_bgcolor = "white", paper_bgcolor = "white",
+                           legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.15))
+  })
+  # 3. Age group x Sex vs metric (grouped boxplot, boxes side by side)
+  output$sq_g3 <- renderPlotly({
+    df <- sq_df()
+    p <- ggplot(df, aes(x = agegrp, y = m, fill = sex)) +
+      geom_boxplot(alpha = 0.65, outlier.shape = NA,
+                   position = position_dodge(width = 0.75)) +
+      geom_point(position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.75),
+                 alpha = 0.5, size = 1.4) +
+      labs(x = NULL, y = sq_lab(), fill = "Sex",
+           title = paste(sq_lab(), "by age group and sex")) +
+      theme_minimal(base_size = 13) + theme(plot.title = element_text(hjust = 0.5))
+    ggplotly(p) %>% layout(boxmode = "group", plot_bgcolor = "white", paper_bgcolor = "white",
+                           legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.15))
+  })
+
+  output$sq_s1 <- renderPrint({
+    df <- sq_df()
+    yg <- df$m[df$agegrp == levels(df$agegrp)[1]]
+    ol <- df$m[df$agegrp == levels(df$agegrp)[2]]
+    ct <- cor.test(df$age, df$m)
+    cat(sprintf("AGE (split at %d): younger mean %.3f (n=%d) vs older mean %.3f (n=%d)\n",
+                input$sq_split, mean(yg), length(yg), mean(ol), length(ol)))
+    if (length(yg) >= 3 && length(ol) >= 3) {
+      tt <- t.test(yg, ol)
+      cat(sprintf("   Welch t-test p = %.4f   |   continuous age: r = %+.3f, p = %.4f  ->  %s\n",
+                  tt$p.value, ct$estimate, ct$p.value,
+                  if (min(tt$p.value, ct$p.value) < 0.05) "differs with age" else "no significant age effect"))
+    }
+  })
+  output$sq_s2 <- renderPrint({
+    df <- sq_df(); tt <- t.test(m ~ sex, df)
+    cat(sprintf("SEX:  Female mean %.3f (n=%d) vs Male mean %.3f (n=%d)\n",
+                mean(df$m[df$sex == "Female"]), sum(df$sex == "Female"),
+                mean(df$m[df$sex == "Male"]),   sum(df$sex == "Male")))
+    cat(sprintf("      Welch t-test p = %.4f  ->  %s\n", tt$p.value,
+                if (tt$p.value < 0.05) "sleep quality DIFFERS by sex" else "no significant sex difference"))
+  })
+  output$sq_s3 <- renderPrint({
+    df <- sq_df(); av <- anova(lm(m ~ agegrp * sex, df))
+    cat("AGE GROUP x SEX (2-way ANOVA, split at", input$sq_split, "yr):\n")
+    for (r in c("agegrp", "sex", "agegrp:sex"))
+      cat(sprintf("   %-12s p = %.4f\n", r, av[r, "Pr(>F)"]))
+    cat("\nMedian by age group x sex:\n")
+    tab <- df %>% group_by(agegrp, sex) %>%
+      summarise(median = round(median(m), 3), n = n(), .groups = "drop")
+    print(as.data.frame(tab), row.names = FALSE)
   })
 
   # ----- Tab 2: Thought 1 — Age & days off -----
