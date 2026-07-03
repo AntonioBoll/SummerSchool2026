@@ -654,11 +654,11 @@ server <- function(input, output) {
     df <- v_data()                                   # numeric vs numeric -> scatter
     if (input$vcol == "sex") {
       p <- ggplot(df, aes(x = x, y = y, colour = sex)) +
-        geom_point(alpha = 0.7, size = 2) + geom_smooth(method = "lm", se = TRUE, linewidth = 0.9)
+        geom_point(alpha = 0.7, size = 2) + geom_smooth(method = "lm", se = FALSE, linewidth = 0.9)
     } else {
       p <- ggplot(df, aes(x = x, y = y)) +
         geom_point(alpha = 0.7, size = 2, colour = "#3182bd") +
-        geom_smooth(method = "lm", se = TRUE, linewidth = 0.9, colour = "black", fill = "grey80")
+        geom_smooth(method = "lm", se = FALSE, linewidth = 0.9, colour = "black")
     }
     p <- p + labs(x = v_lab(input$vx), y = v_lab(input$vy), colour = NULL,
                   title = paste(v_lab(input$vx), "vs", v_lab(input$vy))) +
