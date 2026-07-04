@@ -643,7 +643,7 @@ server <- function(input, output) {
       numcol <- if (is_cat(input$vx)) "y" else "x"
       df <- v_data(); df$val <- as.numeric(df[[numcol]])
       p <- ggplot(df, aes(x = sex, y = val, fill = sex)) +
-        geom_boxplot(alpha = 0.6, width = 0.5, outlier.shape = NA) +
+        geom_boxplot(alpha = 0.6, width = 0.5, outlier.colour = "red", outlier.shape = 16, outlier.size = 2) +
         geom_jitter(width = 0.12, alpha = 0.5, size = 1.5) +
         labs(x = NULL, y = v_group()$numlab, fill = NULL,
              title = paste(v_group()$numlab, "by sex")) +
@@ -748,7 +748,7 @@ server <- function(input, output) {
   output$sq_g1 <- renderPlotly({
     df <- sq_df()
     p <- ggplot(df, aes(x = agegrp, y = m, fill = agegrp)) +
-      geom_boxplot(alpha = 0.6, width = 0.5, outlier.shape = NA) +
+      geom_boxplot(alpha = 0.6, width = 0.5, outlier.colour = "red", outlier.shape = 16, outlier.size = 2) +
       geom_jitter(width = 0.12, alpha = 0.5, size = 1.4) +
       labs(x = NULL, y = sq_lab(), fill = "Age group",
            title = paste(sq_lab(), "by age group")) +
@@ -760,7 +760,7 @@ server <- function(input, output) {
   output$sq_g2 <- renderPlotly({
     df <- sq_df()
     p <- ggplot(df, aes(x = sex, y = m, fill = sex)) +
-      geom_boxplot(alpha = 0.6, width = 0.5, outlier.shape = NA) +
+      geom_boxplot(alpha = 0.6, width = 0.5, outlier.colour = "red", outlier.shape = 16, outlier.size = 2) +
       geom_jitter(width = 0.12, alpha = 0.5, size = 1.4) +
       labs(x = NULL, y = sq_lab(), fill = "Sex",
            title = paste(sq_lab(), "by sex")) +
@@ -772,7 +772,7 @@ server <- function(input, output) {
   output$sq_g3 <- renderPlotly({
     df <- sq_df()
     p <- ggplot(df, aes(x = agegrp, y = m, fill = sex)) +
-      geom_boxplot(alpha = 0.65, outlier.shape = NA,
+      geom_boxplot(alpha = 0.65, outlier.colour = "red", outlier.shape = 16, outlier.size = 2,
                    position = position_dodge(width = 0.75)) +
       geom_point(position = position_jitterdodge(jitter.width = 0.15, dodge.width = 0.75),
                  alpha = 0.5, size = 1.4) +
@@ -873,7 +873,7 @@ server <- function(input, output) {
   output$t1_box <- renderPlotly({
     ylab <- if (is_person()) "Mean acrophase [h]  (per person)" else "Acrophase [h]  (all days)"
     p <- ggplot(t1_long(), aes(x = grp, y = acro, fill = daytype)) +
-      geom_boxplot(alpha = 0.7, outlier.size = 0.5) +
+      geom_boxplot(alpha = 0.7, outlier.colour = "red", outlier.shape = 16, outlier.size = 2) +
       labs(x = NULL, y = ylab, fill = NULL) + theme_minimal(base_size = 13)
     bg(ggplotly(p))
   })
@@ -902,13 +902,13 @@ server <- function(input, output) {
     if (is_person()) {
       p <- ggplot(t1_person(), aes(x = grp, y = shift, fill = grp)) +
         geom_hline(yintercept = 0, linetype = "dashed", colour = "grey40") +
-        geom_boxplot(alpha = 0.55, width = 0.5, outlier.shape = NA) +
+        geom_boxplot(alpha = 0.55, width = 0.5, outlier.colour = "red", outlier.shape = 16, outlier.size = 2) +
         geom_jitter(width = 0.12, alpha = 0.5, size = 1.4) +
         labs(x = NULL, y = "Weekend - weekday shift [h]", fill = NULL) +
         theme_minimal(base_size = 13) + theme(legend.position = "none")
     } else {
       p <- ggplot(t1_long(), aes(x = grp, y = acro, fill = daytype)) +
-        geom_boxplot(alpha = 0.7, outlier.size = 0.5) +
+        geom_boxplot(alpha = 0.7, outlier.colour = "red", outlier.shape = 16, outlier.size = 2) +
         labs(x = NULL, y = "Acrophase [h]  (all days)", fill = NULL) +
         theme_minimal(base_size = 13)
     }
@@ -978,7 +978,7 @@ server <- function(input, output) {
   # SD by sex (boxplot + points)
   output$sd_sexbox <- renderPlotly({
     p <- ggplot(subj_sd, aes(x = sex, y = acro_sd, fill = sex)) +
-      geom_boxplot(alpha = 0.6, width = 0.5, outlier.shape = NA) +
+      geom_boxplot(alpha = 0.6, width = 0.5, outlier.colour = "red", outlier.shape = 16, outlier.size = 2) +
       geom_jitter(width = 0.12, alpha = 0.5, size = 1.3) +
       labs(x = NULL, y = "Circadian SD [h]", fill = NULL) +
       theme_minimal(base_size = 13) + theme(legend.position = "none")
@@ -988,7 +988,7 @@ server <- function(input, output) {
   # SD by age group x sex (grouped boxplot)
   output$sd_agesexbox <- renderPlotly({
     p <- ggplot(sd_data(), aes(x = agegrp, y = acro_sd, fill = sex)) +
-      geom_boxplot(alpha = 0.65, outlier.size = 0.5) +
+      geom_boxplot(alpha = 0.65, outlier.colour = "red", outlier.shape = 16, outlier.size = 2) +
       labs(x = NULL, y = "Circadian SD [h]", fill = NULL) +
       theme_minimal(base_size = 13)
     bg(ggplotly(p))
@@ -1030,7 +1030,7 @@ server <- function(input, output) {
   output$sd_subplot <- renderPlotly({
     df <- sd_sub()
     p <- ggplot(df, aes(x = grp, y = acro_sd, fill = grp)) +
-      geom_boxplot(alpha = 0.6, width = 0.5, outlier.shape = NA) +
+      geom_boxplot(alpha = 0.6, width = 0.5, outlier.colour = "red", outlier.shape = 16, outlier.size = 2) +
       geom_jitter(width = 0.12, alpha = 0.6, size = 1.6) +
       labs(x = NULL, y = "Circadian SD [h]", fill = NULL,
            title = paste(input$sd_sex, "only")) +
@@ -1099,7 +1099,7 @@ server <- function(input, output) {
 
   output$se_sexbox <- renderPlotly({
     p <- ggplot(subj_sd, aes(x = sex, y = sleep_eff, fill = sex)) +
-      geom_boxplot(alpha = 0.6, width = 0.5, outlier.shape = NA) +
+      geom_boxplot(alpha = 0.6, width = 0.5, outlier.colour = "red", outlier.shape = 16, outlier.size = 2) +
       geom_jitter(width = 0.12, alpha = 0.5, size = 1.3) +
       labs(x = NULL, y = "Sleep efficiency", fill = NULL) +
       theme_minimal(base_size = 13) + theme(legend.position = "none")
@@ -1108,7 +1108,7 @@ server <- function(input, output) {
 
   output$se_agesexbox <- renderPlotly({
     p <- ggplot(se_data(), aes(x = agegrp, y = sleep_eff, fill = sex)) +
-      geom_boxplot(alpha = 0.65, outlier.size = 0.5) +
+      geom_boxplot(alpha = 0.65, outlier.colour = "red", outlier.shape = 16, outlier.size = 2) +
       labs(x = NULL, y = "Sleep efficiency", fill = NULL) +
       theme_minimal(base_size = 13)
     bg(ggplotly(p))
@@ -1144,7 +1144,7 @@ server <- function(input, output) {
   })
   output$se_subplot <- renderPlotly({
     p <- ggplot(se_sub(), aes(x = grp, y = sleep_eff, fill = grp)) +
-      geom_boxplot(alpha = 0.6, width = 0.5, outlier.shape = NA) +
+      geom_boxplot(alpha = 0.6, width = 0.5, outlier.colour = "red", outlier.shape = 16, outlier.size = 2) +
       geom_jitter(width = 0.12, alpha = 0.6, size = 1.6) +
       labs(x = NULL, y = "Sleep efficiency", fill = NULL, title = paste(input$se_sex, "only")) +
       theme_minimal(base_size = 13) + theme(legend.position = "none")
@@ -1229,7 +1229,7 @@ server <- function(input, output) {
 
   output$t3_box <- renderPlotly({
     p <- ggplot(subj_sd, aes(x = sex, y = acro_sd, fill = sex)) +
-      geom_boxplot(alpha = 0.6, width = 0.5, outlier.shape = NA) +
+      geom_boxplot(alpha = 0.6, width = 0.5, outlier.colour = "red", outlier.shape = 16, outlier.size = 2) +
       geom_jitter(width = 0.12, alpha = 0.5, size = 1.5) +
       labs(x = NULL, y = "Circadian SD [h]", fill = NULL) +
       theme_minimal(base_size = 13) + theme(legend.position = "none")
